@@ -1,0 +1,11 @@
+apiVersion: v2
+name: pump-monitoring
+description: Helm chart for Pump Monitoring System
+version: 0.1.0
+dependencies:
+  - name: timescaledb-single
+    version: 0.10.0
+    repository: https://charts.timescale.com
+  - name: grafana
+    version: 6.50.7
+    repository: https://grafana.github.io/helm-charts

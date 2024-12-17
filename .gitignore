@@ -1,0 +1,112 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+.env
+.venv
+ENV/
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.eclipse
+.settings/
+.project
+.pydevproject
+
+# Kubernetes and Helm
+*.kubeconfig
+*kubeconfig*
+kubeconfig
+
+# Certificates (be careful with these)
+*.key
+*.csr
+*.srl
+
+# Secrets (do not track)
+*secret.yaml
+secrets/
+*.pem
+
+# Logs and Databases
+*.log
+*.sqlite
+*.db
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.docker
+
+# Helm Chart dependencies
+**/charts/
+Chart.lock
+
+# Minikube
+.minikube/
+
+# Prometheus
+*.metrics
+
+# Terraform (if used)
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# Backup files
+*.bak
+*.gho
+*.ori
+*.orig
+*.tmp
+
+# Local development configs
+local-*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+tmp/
+temp/
+
+# Prometheus data
+data/
+
+certs/
+*.tgz
+output.xml
