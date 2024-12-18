@@ -216,7 +216,7 @@ class PumpDataProducer:
                     time.sleep(self.retry_delay)
                 continue
 
-        logger.error(f"❌ Falha ao armazenar dados após {self.max_retries} tentativas")
+        logger.error(f"❌ Failed to store data after {self.max_retries} attempts")
         return False
 
     def run(self):
@@ -233,7 +233,7 @@ class PumpDataProducer:
         base_delay = 1  # Delay base em segundos
         max_delay = 30  # Delay máximo em segundos
 
-        logger.info(f"✅ Iniciando produtor de dados para bomba {self.pump_id}")
+        logger.info(f"✅ Starting Data Producer for Pump {self.pump_id}")
         
         while True:
             try:
@@ -247,7 +247,7 @@ class PumpDataProducer:
                     consecutive_failures = 0
                     formatted_data = self.format_data(data)
                     PUMP_OPERATIONS.labels(operation_type='total').inc()
-                    logger.info(f"✅ Dados armazenados com sucesso: {formatted_data}")
+                    logger.info(f"✅ Data stored successfully: {formatted_data}")
                     
                     # Delay padrão entre operações bem-sucedidas
                     time.sleep(base_delay)
@@ -257,16 +257,16 @@ class PumpDataProducer:
                     delay = min(base_delay * (2 ** consecutive_failures), max_delay)
                     
                     logger.warning(
-                        f"⚠️ Falha ao armazenar dados. "
-                        f"Tentativa {consecutive_failures} de {max_consecutive_failures}. "
-                        f"Aguardando {delay} segundos."
+                        f" ⚠️ Failed to store data. "
+                        f"Attempt {consecutive_failures} of {max_consecutive_failures}. "
+                        f"Waiting {delay} seconds."
                     )
                     
                     # Verifica se atingiu o limite de falhas consecutivas
                     if consecutive_failures >= max_consecutive_failures:
                         logger.error(
-                            f"❌ Número máximo de falhas consecutivas atingido "
-                            f"({max_consecutive_failures}). Reiniciando serviço..."
+                            f" ❌ Maximum number of consecutive failures reached"
+                            f"({max_consecutive_failures}). Restarting service..."
                         )
                         # Aqui poderíamos implementar uma lógica de reinicialização
                         # Por enquanto, apenas resetamos o contador
@@ -275,7 +275,7 @@ class PumpDataProducer:
                     time.sleep(delay)
                     
             except Exception as e:
-                logger.error(f"❌ Erro crítico no loop principal: {str(e)}")
+                logger.error(f"❌ Critical error in the main loop: {str(e)}")
                 PUMP_OPERATIONS.labels(operation_type='error').inc()
                 
                 # Em caso de erro crítico, aguarda um pouco antes de tentar novamente
@@ -331,7 +331,7 @@ def metrics_summary():
             'system_memory_usage': psutil.virtual_memory().percent
         })
     except Exception as e:
-        logger.error(f"Erro ao obter resumo das métricas: {e}")
+        logger.error(f"❌ Error retrieving metrics summary: {e}")
         return {'error': str(e)}, 500
 
 if __name__ == "__main__":
@@ -341,7 +341,7 @@ if __name__ == "__main__":
     
     # Inicia servidor Prometheus em thread separada
     start_http_server(prometheus_port)
-    logger.info(f"📊 Servidor Prometheus iniciado na porta {prometheus_port}")
+    logger.info(f"📊 Prometheus server started on port {prometheus_port}")
     
     # Inicia servidor Flask em thread separada
     flask_thread = threading.Thread(
@@ -353,15 +353,15 @@ if __name__ == "__main__":
         daemon=True  # Garante que a thread termine quando o programa principal terminar
     )
     flask_thread.start()
-    logger.info(f"🌐 Servidor Flask iniciado na porta {flask_port}")
+    logger.info(f"🌐 Flask server started on port {flask_port}")
     
     try:
         # Inicia o produtor
         producer = PumpDataProducer()
-        logger.info("🚀 Iniciando produtor de dados...")
+        logger.info("🚀 Starting data producer...")
         producer.run()
     except KeyboardInterrupt:
-        logger.info("👋 Encerrando produtor de dados...")
+        logger.info("👋 Wrapping up data producer...")
     except Exception as e:
-        logger.error(f"❌ Erro fatal ao iniciar produtor: {str(e)}")
+        logger.error(f"❌ Crash when starting producer: {str(e)}")
         raise

@@ -1,33 +1,33 @@
 #!/bin/bash
 
-# Carrega variáveis de ambiente
+# Load environment variables
 set -a
 source .env
 set +a
 
-# Configurações
+# Configurations
 NAMESPACE="${KUBERNETES_NAMESPACE:-default}"
 SERVICE_NAME="pump-monitoring-timescaledb"
 SECRET_NAME="${KUBERNETES_CERTIFICATE_SECRET_NAME:-pump-monitoring-certificate}"
 
-# Criar diretório para certificados
+# Create directory for certificates
 mkdir -p certs
 cd certs
 
-# Gerar chave privada da CA
+# Generate CA private key
 openssl genrsa -out ca.key 4096
 
-# Gerar certificado CA auto-assinado
+# Generate self-signed CA certificate
 openssl req -x509 -new -nodes -key ca.key -days 365 -out ca.crt \
     -subj "/CN=TimescaleDB-CA"
 
-# Gerar chave privada do servidor
+# Generate server private key
 openssl genrsa -out server.key 2048
 
-# Configurar permissões da chave
+# Set key permissions
 chmod 600 server.key
 
-# Gerar CSR (Certificate Signing Request)
+# Generate CSR (Certificate Signing Request)
 cat > server.conf << EOF
 [req]
 req_extensions = v3_req
@@ -53,23 +53,23 @@ EOF
 openssl req -new -key server.key -out server.csr \
     -subj "/CN=${SERVICE_NAME}" -config server.conf
 
-# Assinar o certificado do servidor com a CA
+# Sign the server certificate with the CA
 openssl x509 -req -in server.csr \
     -CA ca.crt -CAkey ca.key -CAcreateserial \
     -out server.crt -days 365 \
     -extensions v3_req -extfile server.conf
 
-# Criar diretório k8s-config se não existir
+# Create k8s-config directory if it doesn't exist
 mkdir -p ../k8s-config
 
-# Criar Secret no Kubernetes
+# Create Secret in Kubernetes
 kubectl create secret generic ${SECRET_NAME} \
     --from-file=tls.crt=server.crt \
     --from-file=tls.key=server.key \
     --from-file=ca.crt=ca.crt \
     --dry-run=client -o yaml > ../k8s-config/certificates-secret.yaml
 
-# Aplicar o secret no namespace correto
+# Apply the secret to the correct namespace
 kubectl apply -f ../k8s-config/certificates-secret.yaml -n ${NAMESPACE}
 
-echo "✅ Certificados gerados com sucesso no namespace ${NAMESPACE}!"
+echo "✅ Certificates successfully generated in namespace ${NAMESPACE}!"

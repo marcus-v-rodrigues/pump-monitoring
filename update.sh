@@ -1,22 +1,28 @@
 #!/bin/bash
 
-echo "🔄 Verificando Docker Desktop..."
+echo "🔄 Checking Docker Desktop..."
 if ! docker info &> /dev/null; then
-    echo "❌ Docker não está rodando. Abra o Docker Desktop no Windows primeiro."
+    echo "❌ Docker is not running. Please open Docker Desktop on Windows first."
     exit 1
 fi
 
-echo "🔄 Configurando Docker para Minikube..."
+echo "🔄 Setting up Docker for Minikube..."
 eval $(minikube docker-env)
 
-echo "🏗️ Construindo nova imagem do produtor..."
-docker build -t pump-producer:latest .
+echo "🏗️ Building producer image..."
+docker build -t pump-producer:latest -f docker/producer/Dockerfile .
 
-echo "🔄 Reiniciando pods do produtor..."
+echo "🏗️ Building TimescaleDB image..."
+docker build -t pump-monitoring-timescaledb:latest -f docker/timescaledb/Dockerfile .
+
+echo "🏗️ Building Grafana image..."
+docker build -t pump-monitoring-grafana:latest -f docker/grafana/Dockerfile .
+
+echo "🔄 Restarting producer pods..."
 kubectl rollout restart deployment pump-monitoring-producer
 
-echo "⏳ Aguardando pods reiniciarem..."
+echo "⏳ Waiting for pods to restart..."
 kubectl rollout status deployment pump-monitoring-producer
 
-echo "📝 Logs do produtor:"
+echo "📝 Producer logs:"
 kubectl logs -l app=pump-producer --tail=20 -f

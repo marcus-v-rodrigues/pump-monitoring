@@ -20,7 +20,7 @@ data:
             "type": "postgres",
             "uid": "TimescaleDB"
           },
-          "description": "Pressão e Fluxo ao Longo do Tempo",
+          "description": "Pressure and Flow Over Time",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -150,7 +150,7 @@ data:
               "refId": "A"
             }
           ],
-          "title": "Temperatura Atual",
+          "title": "Current Temperature",
           "type": "gauge"
         },
         {
@@ -236,7 +236,7 @@ data:
               "legendFormat": "{{`{{ __name__ }}`}}"
             }
           ],
-          "title": "Recursos do Sistema",
+          "title": "System Resources",
           "type": "timeseries"
         },
         {
@@ -322,7 +322,7 @@ data:
               "refId": "A"
             }
           ],
-          "title": "Taxa de Operações (5min)",
+          "title": "Operations Rate (5min)",
           "type": "timeseries"
         }
       ],
@@ -334,7 +334,7 @@ data:
         "from": "now-6h",
         "to": "now"
       },
-      "title": "Monitoramento da Bomba",
+      "title": "Pump Monitoring",
       "uid": "pump-monitoring",
       "version": 1,
       "weekStart": ""
