@@ -34,7 +34,9 @@ app = Flask(__name__)
 PUMP_METRICS = Gauge('pump_metrics', 'Métricas da bomba', ['metric_type'])
 PUMP_OPERATIONS = Counter('pump_operations_total', 'Total de operações da bomba', ['operation_type'])
 PUMP_DATA_PROCESSING_TIME = Histogram('pump_data_processing_seconds', 'Tempo de processamento dos dados')
-SYSTEM_METRICS = Gauge('system_metrics', 'Métricas do sistema', ['metric_type'])
+SYSTEM_CPU_USAGE = Gauge('system_cpu_usage', 'Uso de CPU do sistema')
+SYSTEM_MEMORY_USAGE = Gauge('system_memory_usage', 'Uso de memória do sistema')
+SYSTEM_DISK_USAGE = Gauge('system_disk_usage', 'Uso de disco do sistema')
 
 load_dotenv()
 
@@ -56,26 +58,27 @@ class PumpDataProducer:
         self.setup_system_metrics_monitoring()
 
     def setup_system_metrics_monitoring(self):
-        """Configura monitoramento de métricas do sistema."""
         def monitor_system_metrics():
+            last_update = 0
             while True:
-                try:                   
+                try:
+                    current_time = time.time()
+                    if current_time - last_update >= 15:
+                        cpu_usage = psutil.cpu_percent(interval=1)
+                        memory_usage = psutil.virtual_memory().percent
+                        disk_usage = psutil.disk_usage('/').percent
 
-                    # Coleta CPU com intervalo de 1 segundo para maior precisão
-                    cpu_usage = psutil.cpu_percent(interval=1)
-                    memory_usage = psutil.virtual_memory().percent
-                    disk_usage = psutil.disk_usage('/').percent
+                        SYSTEM_CPU_USAGE.set(cpu_usage)
+                        SYSTEM_MEMORY_USAGE.set(memory_usage)
+                        SYSTEM_DISK_USAGE.set(disk_usage)
 
-                    # Atualiza métricas do Prometheus
-                    SYSTEM_METRICS.labels(metric_type='cpu_usage').set(cpu_usage)
-                    SYSTEM_METRICS.labels(metric_type='memory_usage').set(memory_usage)
-
-                    logger.info(f"Sistema - CPU: {cpu_usage}%, Memória: {memory_usage}%, Disco: {disk_usage}%")
+                        logger.info(f"Sistema - CPU: {cpu_usage}%, Memória: {memory_usage}%, Disco: {disk_usage}%")
+                        last_update = current_time
+                    time.sleep(1)
                 except Exception as e:
                     logger.error(f"Erro ao coletar métricas do sistema: {e}")
-                time.sleep(14)  # 14 segundos + 1 segundo do interval = 15 segundos total
-        
-        # Inicia a thread de monitoramento
+                    time.sleep(1)
+
         threading.Thread(target=monitor_system_metrics, daemon=True).start()
 
     def setup_database(self):
@@ -173,7 +176,6 @@ class PumpDataProducer:
         return data
 
     def store_data(self, data):
-        """Armazena os dados no TimescaleDB com tratamento de erros."""
         retry_count = 0
         
         while retry_count < self.max_retries:
@@ -199,25 +201,20 @@ class PumpDataProducer:
                 cur.close()
                 conn.close()
 
-                # Atualizar métricas Prometheus
+                # Atualizar métricas da bomba
                 for key, value in data.items():
                     PUMP_METRICS.labels(metric_type=key).set(value)
 
                 PUMP_OPERATIONS.labels(operation_type='success').inc()
                 return True
 
-            except psycopg2.Error as e:
+            except Exception as e:
                 retry_count += 1
                 logger.error(f"Tentativa {retry_count} falhou ao armazenar dados: {e}")
                 PUMP_OPERATIONS.labels(operation_type='failure').inc()
                 if retry_count < self.max_retries:
                     time.sleep(self.retry_delay)
                 continue
-                
-            except Exception as e:
-                logger.error(f"Erro inesperado ao armazenar dados: {e}")
-                PUMP_OPERATIONS.labels(operation_type='error').inc()
-                return False
 
         logger.error(f"❌ Falha ao armazenar dados após {self.max_retries} tentativas")
         return False
@@ -251,9 +248,6 @@ class PumpDataProducer:
                     formatted_data = self.format_data(data)
                     PUMP_OPERATIONS.labels(operation_type='total').inc()
                     logger.info(f"✅ Dados armazenados com sucesso: {formatted_data}")
-                    
-                    # Atualiza métricas de sistema
-                    SYSTEM_METRICS.labels(metric_type='storage_operations').inc()
                     
                     # Delay padrão entre operações bem-sucedidas
                     time.sleep(base_delay)

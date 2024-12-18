@@ -232,9 +232,8 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "system_metrics{metric_type=~\"cpu_usage|memory_usage\"}",
-              "legendFormat": "{{`{{metric_type}}`}}",
-              "refId": "A"
+              "expr": "{__name__=~\"system_cpu_usage|system_memory_usage|system_disk_usage\"}",
+              "legendFormat": "{{`{{ __name__ }}`}}"
             }
           ],
           "title": "Recursos do Sistema",
