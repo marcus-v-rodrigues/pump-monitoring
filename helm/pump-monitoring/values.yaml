@@ -111,6 +111,16 @@ timescaledb-single:
 
 # Configurações do Grafana
 grafana:
+  extraVolumes:
+    - name: ssl-certs
+      secret:
+        secretName: ${KUBERNETES__CERTIFICATE_SECRET_NAME}
+
+  extraVolumeMounts:
+    - name: ssl-certs
+      mountPath: /etc/grafana/ssl
+      readOnly: true
+      
   adminPassword: ${GRAFANA__ADMIN_PASSWORD}
   
   persistence:
@@ -144,8 +154,8 @@ grafana:
           user: ${DATABASE__USER}
           jsonData:
             database: ${DATABASE__NAME}
-            sslmode: "verify-full"
-            tlsAuthWithCACert: true
+            sslmode: "require"
+            tlsAuthWithCACert: false  
             tlsConfigurationMethod: "file"
             tlsCACert: ${SSL__CA_FILE}
             tlsClientCert: ${SSL__CERT_FILE}

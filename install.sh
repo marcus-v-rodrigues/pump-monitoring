@@ -69,7 +69,7 @@ helm install pump-monitoring ./helm/pump-monitoring \
   --set timescaledb-single.resources.requests.cpu="${TIMESCALEDB_CPU_REQUEST:-250m}" \
   --set grafana.adminPassword="${GRAFANA_ADMIN_PASSWORD:-admin}" \
   --set grafana.persistence.size="${GRAFANA_PERSISTENCE_SIZE:-1Gi}" \
-  --wait --timeout 10m
+  --wait --timeout 1m
 
 # Limpar arquivo temporário
 rm -f values-processed.yaml
