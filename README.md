@@ -20,6 +20,8 @@ The system offers a range of capabilities designed to enhance pump monitoring an
 
 ## System Architecture
 
+![Pump Monitoring Architecture Diagram](public/pump-monitoring-architecture-diagram.svg)
+
 The system is built on a modern, containerized architecture with the following core components:
 
 - Data Producers: Python services that simulate pump operation
@@ -46,7 +48,7 @@ Follow these steps to install the Pump Monitoring System:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-org/pump-monitoring.git
+   git clone https://github.com/marcus-v-rodrigues/pump-monitoring
    cd pump-monitoring
    ```
 
@@ -237,13 +239,6 @@ We welcome contributions to the Pump Monitoring System. Please read our contribu
 2. Create a development branch
 3. Make your changes
 4. Submit a pull request
-
-### Testing
-
-Run the test suite:
-```bash
-python -m pytest tests/
-```
 
 ## License
 
