@@ -5,7 +5,7 @@ metadata:
   labels:
     grafana_dashboard: "1"
 data:
-  pump-dashboards.json: |
+  pump-dashboards.json: |-
     {
       "annotations": {
         "list": []
@@ -54,53 +54,8 @@ data:
                 "thresholdsStyle": {
                   "mode": "off"
                 }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "pressure"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Pressão"
-                  },
-                  {
-                    "id": "unit",
-                    "value": "pressurepsi"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "flow_rate"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Fluxo"
-                  },
-                  {
-                    "id": "unit",
-                    "value": "flowmlpm"
-                  }
-                ]
               }
-            ]
+            }
           },
           "gridPos": {
             "h": 8,
@@ -115,41 +70,17 @@ data:
               "displayMode": "table",
               "placement": "bottom",
               "showLegend": true
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
             }
           },
-          "pluginVersion": "10.0.3",
           "targets": [
             {
               "datasource": {
                 "type": "postgres",
                 "uid": "TimescaleDB"
               },
-              "editorMode": "code",
-              "format": "time_series",
               "rawQuery": true,
               "rawSql": "SELECT\n  time_bucket('1m', time) AS \"time\",\n  avg(pressure) as pressure,\n  avg(flow_rate) as flow_rate\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nGROUP BY 1\nORDER BY 1;",
-              "refId": "A",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              }
+              "refId": "A"
             }
           ],
           "title": "Pressão e Fluxo",
@@ -203,39 +134,17 @@ data:
               ],
               "fields": "",
               "values": false
-            },
-            "showThresholdLabels": false,
-            "showThresholdMarkers": true
+            }
           },
-          "pluginVersion": "10.0.3",
           "targets": [
             {
               "datasource": {
                 "type": "postgres",
                 "uid": "TimescaleDB"
               },
-              "editorMode": "code",
-              "format": "time_series",
               "rawQuery": true,
               "rawSql": "SELECT\n  time as \"time\",\n  temperature\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nORDER BY time DESC\nLIMIT 1;",
-              "refId": "A",
-              "sql": {
-                "columns": [
-                  {
-                    "parameters": [],
-                    "type": "function"
-                  }
-                ],
-                "groupBy": [
-                  {
-                    "property": {
-                      "type": "string"
-                    },
-                    "type": "groupBy"
-                  }
-                ],
-                "limit": 50
-              }
+              "refId": "A"
             }
           ],
           "title": "Temperatura Atual",
@@ -243,22 +152,57 @@ data:
         },
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "TimescaleDB"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "fieldConfig": {
             "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
               "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Percentual",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
                   "tooltip": false,
                   "viz": false
                 },
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
                 "scaleDistribution": {
                   "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
                 }
-              }
-            }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              },
+              "unit": "percent"
+            },
+            "overrides": []
           },
           "gridPos": {
             "h": 8,
@@ -266,73 +210,128 @@ data:
             "x": 12,
             "y": 8
           },
-          "id": 3,
+          "id": 4,
           "options": {
-            "calculate": true,
-            "calculation": {
-              "xBucketNumber": "20",
-              "xBucketSize": "",
-              "yBucketNumber": "",
-              "yBucketSize": ""
-            },
-            "cellGap": 1,
-            "color": {
-              "exponent": 0.5,
-              "fill": "#b4ff00",
-              "mode": "scheme",
-              "reverse": false,
-              "scale": "exponential",
-              "scheme": "Spectral",
-              "steps": 64
-            },
-            "exemplars": {
-              "color": "rgba(255,0,255,0.7)"
-            },
-            "filterValues": {
-              "le": 1e-9
-            },
             "legend": {
-              "show": true
+              "calcs": ["mean", "max"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
             },
             "tooltip": {
-              "show": true,
-              "yHistogram": false
-            },
-            "yAxis": {
-              "unit": "short"
+              "mode": "multi",
+              "sort": "none"
             }
           },
-          "pluginVersion": "10.0.3",
           "targets": [
             {
               "datasource": {
-                "type": "postgres",
-                "uid": "TimescaleDB"
+                "type": "prometheus",
+                "uid": "prometheus"
               },
-              "editorMode": "code",
-              "format": "time_series",
-              "rawQuery": true,
-              "rawSql": "SELECT\n  time as \"time\",\n  vibration as \"value\"\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nORDER BY 1;",
+              "expr": "system_metrics{metric_type=~\"cpu_usage|memory_usage\"}",
+              "legendFormat": "$metric_type",
               "refId": "A"
             }
           ],
-          "title": "Mapa de Calor - Vibração",
-          "type": "heatmap"
+          "title": "Recursos do Sistema",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "Operações",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 100,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 16
+          },
+          "id": 5,
+          "options": {
+            "legend": {
+              "calcs": ["sum"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "rate(pump_operations_total[5m])",
+              "legendFormat": "$operation_type",
+              "refId": "A"
+            }
+          ],
+          "title": "Taxa de Operações (5min)",
+          "type": "timeseries"
         }
       ],
       "refresh": "5s",
       "schemaVersion": 38,
       "style": "dark",
       "tags": ["pump"],
-      "templating": {
-        "list": []
-      },
       "time": {
         "from": "now-6h",
         "to": "now"
       },
-      "timepicker": {},
-      "timezone": "",
       "title": "Monitoramento da Bomba",
       "uid": "pump-monitoring",
       "version": 1,

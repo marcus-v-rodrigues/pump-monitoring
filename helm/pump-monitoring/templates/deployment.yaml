@@ -2,8 +2,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-producer
+  labels:
+    {{- include "pump-monitoring.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.producer.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: pump-producer
@@ -11,58 +18,83 @@ spec:
     metadata:
       labels:
         app: pump-producer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.global.env.MONITORING_PROMETHEUS_PORT | int }}"
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - pump-producer
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: producer
           image: {{ .Values.producer.image.repository }}:{{ .Values.producer.image.tag }}
           imagePullPolicy: {{ .Values.producer.image.pullPolicy }}
           env:
-            - name: DATABASE__HOST
-              value: {{ .Values.global.env.DATABASE__HOST | quote }}
-            - name: DATABASE__NAME
-              value: {{ .Values.global.env.DATABASE__NAME | quote }}
-            - name: DATABASE__USER
-              value: {{ .Values.global.env.DATABASE__USER | quote }}
-            - name: DATABASE__PORT
-              value: {{ .Values.global.env.DATABASE__PORT | quote }}
-            - name: DATABASE__PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.env.KUBERNETES__CREDENTIALS_SECRET_NAME }}
-                  key: PATRONI_SUPERUSER_PASSWORD
-            - name: PUMP__ID
-              value: {{ .Values.global.env.PUMP__ID | quote }}
-            - name: MONITORING__PROMETHEUS_PORT
-              value: {{ .Values.global.env.MONITORING__PROMETHEUS_PORT | quote }}
-            - name: MONITORING__FLASK_PORT
-              value: {{ .Values.global.env.MONITORING__FLASK_PORT | quote }}
-            - name: LOGGING__LEVEL
-              value: {{ .Values.global.env.LOGGING__LEVEL | default "INFO" | quote }}
-            - name: LOGGING__FORMAT
-              value: {{ .Values.global.env.LOGGING__FORMAT | default "json" | quote }}
-            - name: MONITORING__DEBUG
-              value: {{ .Values.global.env.MONITORING__DEBUG | default "false" | quote }}
-            - name: DATA__RETENTION_DAYS
-              value: {{ .Values.global.env.DATA__RETENTION_DAYS | default "30" | quote }}
-            - name: DATA__BACKUP_ENABLED
-              value: {{ .Values.global.env.DATA__BACKUP_ENABLED | default "false" | quote }}
-            - name: ENVIRONMENT__TYPE
-              value: {{ .Values.global.env.ENVIRONMENT__TYPE | quote }}
+            {{- include "pump-monitoring.producerEnv" . | nindent 12 }}
           ports:
-            - containerPort: {{ .Values.global.env.MONITORING__FLASK_PORT | default 8080 }}
-            - containerPort: {{ .Values.global.env.MONITORING__PROMETHEUS_PORT | default 8000 }}
+            - name: metrics
+              containerPort: {{ .Values.global.env.MONITORING_PROMETHEUS_PORT | int }}
+            - name: http
+              containerPort: {{ .Values.global.env.MONITORING_FLASK_PORT | int }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
           resources:
             {{- toYaml .Values.producer.resources | nindent 12 }}
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/certificate
+              readOnly: true
+      volumes:
+        - name: ssl-certs
+          secret:
+            secretName: {{ .Values.global.env.KUBERNETES_CERTIFICATE_SECRET_NAME }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-timescaledb
+  name: {{ .Release.Name }}-producer
+  labels:
+    {{- include "pump-monitoring.labels" . | nindent 4 }}
 spec:
-  selector:
-    statefulset.kubernetes.io/pod-name: {{ .Release.Name }}-timescaledb-0
-  ports:
-    - protocol: TCP
-      port: {{ .Values.global.env.DATABASE__PORT }}
-      targetPort: {{ .Values.global.env.DATABASE__PORT }}
   type: ClusterIP
+  ports:
+    - port: {{ .Values.global.env.MONITORING_PROMETHEUS_PORT | int }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    - port: {{ .Values.global.env.MONITORING_FLASK_PORT | int }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: pump-producer

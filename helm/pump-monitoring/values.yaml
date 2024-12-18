@@ -2,54 +2,75 @@
 global:
   env:
     # Database Configuration
-    DATABASE__HOST: ${DATABASE__HOST}
-    DATABASE__PORT: ${DATABASE__PORT}
-    DATABASE__NAME: ${DATABASE__NAME}
-    DATABASE__USER: ${DATABASE__USER}
-    DATABASE__PASSWORD: ${DATABASE__PASSWORD}
+    DATABASE_HOST: ${DATABASE_HOST}
+    DATABASE_PORT: ${DATABASE_PORT}
+    DATABASE_NAME: ${DATABASE_NAME}
+    DATABASE_USER: ${DATABASE_USER}
+    DATABASE_PASSWORD: ${DATABASE_PASSWORD}
     
     # Pump Configuration
-    PUMP__ID: ${PUMP__ID}
-    PUMP__REPLICA_COUNT: ${PUMP__REPLICA_COUNT}
+    PUMP_ID: ${PUMP_ID}
+    PUMP_REPLICA_COUNT: ${PUMP_REPLICA_COUNT}
     
     # Kubernetes Configuration
-    KUBERNETES__NAMESPACE: ${KUBERNETES__NAMESPACE}
-    KUBERNETES__CERTIFICATE_SECRET_NAME: ${KUBERNETES__CERTIFICATE_SECRET_NAME}
-    KUBERNETES__CREDENTIALS_SECRET_NAME: ${KUBERNETES__CREDENTIALS_SECRET_NAME}
+    KUBERNETES_NAMESPACE: ${KUBERNETES_NAMESPACE}
+    KUBERNETES_CERTIFICATE_SECRET_NAME: ${KUBERNETES_CERTIFICATE_SECRET_NAME}
+    KUBERNETES_CREDENTIALS_SECRET_NAME: ${KUBERNETES_CREDENTIALS_SECRET_NAME}
     
     # Monitoring Configuration
-    MONITORING__PROMETHEUS_PORT: ${MONITORING__PROMETHEUS_PORT}
-    MONITORING__FLASK_PORT: ${MONITORING__FLASK_PORT}
-    MONITORING__DEBUG: ${MONITORING__DEBUG}
+    MONITORING_PROMETHEUS_PORT: ${MONITORING_PROMETHEUS_PORT}
+    MONITORING_FLASK_PORT: ${MONITORING_FLASK_PORT}
+    MONITORING_DEBUG: ${MONITORING_DEBUG}
     
     # Logging Configuration
-    LOGGING__LEVEL: ${LOGGING__LEVEL}
-    LOGGING__FORMAT: ${LOGGING__FORMAT}
+    LOGGING_LEVEL: ${LOGGING_LEVEL}
+    LOGGING_FORMAT: ${LOGGING_FORMAT}
     
     # Data Management
-    DATA__RETENTION_DAYS: ${DATA__RETENTION_DAYS}
-    DATA__BACKUP_ENABLED: ${DATA__BACKUP_ENABLED}
+    DATA_RETENTION_DAYS: ${DATA_RETENTION_DAYS}
+    DATA_BACKUP_ENABLED: ${DATA_BACKUP_ENABLED}
     
     # Environment
-    ENVIRONMENT__TYPE: ${ENVIRONMENT__TYPE}
-    ENVIRONMENT__PROFILE: ${ENVIRONMENT__PROFILE}
+    ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE}
+    ENVIRONMENT_PROFILE: ${ENVIRONMENT_PROFILE}
 
 # Configurações do Produtor de Dados
 producer:
-  replicaCount: ${PUMP__REPLICA_COUNT}
+  replicaCount: ${PUMP_REPLICA_COUNT}
   image:
     repository: pump-producer
     tag: latest
     pullPolicy: Never
   
+  # Configurações de autoscaling
+  autoscaling:
+    enabled: true
+    maxReplicas: 5
+    targetCPUUtilization: 70
+    targetMemoryUtilization: 80
+  
   # Recursos computacionais
   resources:
     limits:
-      cpu: ${PRODUCER__CPU__LIMIT}
-      memory: ${PRODUCER__MEMORY__LIMIT}
+      cpu: ${PRODUCER_CPU_LIMIT}
+      memory: ${PRODUCER_MEMORY_LIMIT}
     requests:
-      cpu: ${PRODUCER__CPU__REQUEST}
-      memory: ${PRODUCER__MEMORY__REQUEST}
+      cpu: ${PRODUCER_CPU_REQUEST}
+      memory: ${PRODUCER_MEMORY_REQUEST}
+
+# Configurações de Monitoramento
+monitoring:
+  alerts:
+    highPressureThreshold: 3.5
+    highTemperatureThreshold: 42
+    vibrationThreshold: 0.8
+  
+  retention:
+    metrics: 15d
+    alerts: 30d
+
+  dashboards:
+    updateInterval: 5s
 
 # Configurações do TimescaleDB
 timescaledb-single:
@@ -57,19 +78,19 @@ timescaledb-single:
   fullnameOverride: "pump-monitoring-timescaledb"
   
   image:
-    tag: ${TIMESCALEDB__IMAGE_TAG}
+    tag: ${TIMESCALEDB_IMAGE_TAG}
   
   replicaCount: 1
   
   patroni:
     postgresql:
       parameters:
-        max_connections: ${TIMESCALEDB__MAX_CONNECTIONS}
-        shared_buffers: ${TIMESCALEDB__SHARED_BUFFERS}
+        max_connections: ${TIMESCALEDB_MAX_CONNECTIONS}
+        shared_buffers: ${TIMESCALEDB_SHARED_BUFFERS}
         ssl: "on"
-        ssl_ca_file: ${SSL__CA_FILE}
-        ssl_cert_file: ${SSL__CERT_FILE}
-        ssl_key_file: ${SSL__KEY_FILE}
+        ssl_ca_file: ${SSL_CA_FILE}
+        ssl_cert_file: ${SSL_CERT_FILE}
+        ssl_key_file: ${SSL_KEY_FILE}
         listen_addresses: "*"
       
       pg_hba:
@@ -81,18 +102,18 @@ timescaledb-single:
   
   persistence:
     enabled: true
-    size: ${TIMESCALEDB__PERSISTENCE_SIZE}
+    size: ${TIMESCALEDB_PERSISTENCE_SIZE}
   
   resources:
     requests:
-      memory: ${TIMESCALEDB__MEMORY__REQUEST}
-      cpu: ${TIMESCALEDB__CPU__REQUEST}
+      memory: ${TIMESCALEDB_MEMORY_REQUEST}
+      cpu: ${TIMESCALEDB_CPU_REQUEST}
     limits:
-      memory: ${TIMESCALEDB__MEMORY__LIMIT}
-      cpu: ${TIMESCALEDB__CPU__LIMIT}
+      memory: ${TIMESCALEDB_MEMORY_LIMIT}
+      cpu: ${TIMESCALEDB_CPU_LIMIT}
   
   tls:
-    certificatesSecret: ${KUBERNETES__CERTIFICATE_SECRET_NAME}
+    certificatesSecret: ${KUBERNETES_CERTIFICATE_SECRET_NAME}
     certificate:
       keyFile: "tls.key"
       certFile: "tls.crt"
@@ -101,10 +122,10 @@ timescaledb-single:
   service:
     primary:
       type: ClusterIP
-      port: ${DATABASE__PORT}
+      port: ${DATABASE_PORT}
   
   backup:
-    enabled: ${DATA__BACKUP_ENABLED}
+    enabled: ${DATA_BACKUP_ENABLED}
 
   pgBouncer:
     enabled: false
@@ -114,18 +135,18 @@ grafana:
   extraVolumes:
     - name: ssl-certs
       secret:
-        secretName: ${KUBERNETES__CERTIFICATE_SECRET_NAME}
+        secretName: ${KUBERNETES_CERTIFICATE_SECRET_NAME}
 
   extraVolumeMounts:
     - name: ssl-certs
       mountPath: /etc/grafana/ssl
       readOnly: true
-      
-  adminPassword: ${GRAFANA__ADMIN_PASSWORD}
+
+  adminPassword: ${GRAFANA_ADMIN_PASSWORD}
   
   persistence:
     enabled: true
-    size: ${GRAFANA__PERSISTENCE_SIZE}
+    size: ${GRAFANA_PERSISTENCE_SIZE}
   
   dashboardProviders:
     dashboardproviders.yaml:
@@ -149,21 +170,21 @@ grafana:
       datasources:
         - name: TimescaleDB
           type: postgres
-          url: ${DATABASE__HOST}:${DATABASE__PORT}
-          database: ${DATABASE__NAME}
-          user: ${DATABASE__USER}
+          url: ${DATABASE_HOST}:${DATABASE_PORT}
+          database: ${DATABASE_NAME}
+          user: ${DATABASE_USER}
           jsonData:
-            database: ${DATABASE__NAME}
+            database: ${DATABASE_NAME}
             sslmode: "require"
             tlsAuthWithCACert: false  
             tlsConfigurationMethod: "file"
-            tlsCACert: ${SSL__CA_FILE}
-            tlsClientCert: ${SSL__CERT_FILE}
-            tlsClientKey: ${SSL__KEY_FILE}
-            maxOpenConns: ${TIMESCALEDB__MAX_CONNECTIONS}
-            maxIdleConns: ${TIMESCALEDB__MAX_CONNECTIONS}
+            tlsCACert: ${SSL_CA_FILE}
+            tlsClientCert: ${SSL_CERT_FILE}
+            tlsClientKey: ${SSL_KEY_FILE}
+            maxOpenConns: ${TIMESCALEDB_MAX_CONNECTIONS}
+            maxIdleConns: ${TIMESCALEDB_MAX_CONNECTIONS}
             connMaxLifetime: 14400
             postgresVersion: 1400
             timescaledb: true
           secureJsonData:
-            password: ${DATABASE__PASSWORD}
+            password: ${DATABASE_PASSWORD}

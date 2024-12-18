@@ -27,9 +27,21 @@ kubectl delete configmaps --all || true
 kubectl delete secrets --all || true
 
 echo "⏳ Aguardando limpeza completa..."
-while kubectl get pods 2>/dev/null | grep -q .; do
-    echo "Aguardando pods serem removidos..."
-    sleep 2
+kubectl delete pods,deployments,statefulsets,services,pvc,configmaps,secrets --all --force --grace-period=0 --timeout=60s || true
+
+echo "📦 Atualizando repositórios Helm..."
+helm repo add timescale https://charts.timescale.com
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+echo "🔐 Instalando Prometheus Operator..."
+helm install prometheus prometheus-community/kube-prometheus-stack
+
+echo "⏳ Aguardando CRDs do Prometheus serem instalados..."
+while ! kubectl get crds | grep -q "monitoring.coreos.com"; do
+   echo "Aguardando CRDs..."
+   sleep 5
 done
 
 echo "🔐 Gerando certificados SSL..."
@@ -43,13 +55,18 @@ chmod +x generate_credentials.sh
 echo "🏗️ Construindo imagem do produtor..."
 docker build -t pump-producer:latest .
 
-echo "📦 Atualizando repositórios Helm..."
-helm repo add timescale https://charts.timescale.com
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo update
-
 # Criar um arquivo de valores temporário com as variáveis de ambiente substituídas
 echo "📝 Gerando arquivo de valores com variáveis de ambiente..."
+
+# Antes do envsubst
+while IFS='=' read -r key value; do
+    # Ignora linhas vazias e comentários
+    [[ -z "$key" || $key == \#* ]] && continue
+    # Remove espaços e aspas
+    value=$(echo "$value" | tr -d '"' | tr -d "'")
+    export "$key"="$value"
+done < .env
+
 envsubst < helm/pump-monitoring/values.yaml > values-processed.yaml
 
 echo "🚀 Instalando Helm chart..."

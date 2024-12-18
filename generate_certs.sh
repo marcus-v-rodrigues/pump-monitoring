@@ -6,9 +6,9 @@ source .env
 set +a
 
 # Configurações
-NAMESPACE="${KUBERNETES__NAMESPACE:-default}"
+NAMESPACE="${KUBERNETES_NAMESPACE:-default}"
 SERVICE_NAME="pump-monitoring-timescaledb"
-SECRET_NAME="${KUBERNETES__CERTIFICATE_SECRET_NAME:-pump-monitoring-certificate}"
+SECRET_NAME="${KUBERNETES_CERTIFICATE_SECRET_NAME:-pump-monitoring-certificate}"
 
 # Criar diretório para certificados
 mkdir -p certs

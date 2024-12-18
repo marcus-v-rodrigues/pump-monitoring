@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-producer-monitor
+  labels:
+    {{- include "pump-monitoring.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: pump-producer
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}

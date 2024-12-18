@@ -1,0 +1,45 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-alerts
+  labels:
+    {{- include "pump-monitoring.labels" . | nindent 4 }}
+spec:
+  groups:
+  - name: pump.rules
+    rules:
+    - alert: HighPumpPressure
+      expr: pump_metrics{metric_type="pressure"} > {{ .Values.monitoring.alerts.highPressureThreshold }}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Alta pressão detectada"
+        description: "A pressão da bomba está acima do limite de {{ .Values.monitoring.alerts.highPressureThreshold }} PSI"
+    
+    - alert: HighPumpTemperature
+      expr: pump_metrics{metric_type="temperature"} > {{ .Values.monitoring.alerts.highTemperatureThreshold }}
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Temperatura crítica detectada"
+        description: "A temperatura da bomba está acima do limite de {{ .Values.monitoring.alerts.highTemperatureThreshold }}°C"
+    
+    - alert: AbnormalVibration
+      expr: pump_metrics{metric_type="vibration"} > {{ .Values.monitoring.alerts.vibrationThreshold }}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Vibração anormal detectada"
+        description: "A vibração da bomba está acima do limite de {{ .Values.monitoring.alerts.vibrationThreshold }} mm/s"
+    
+    - alert: ProducerPodDown
+      expr: up{app="pump-producer"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod produtor inativo"
+        description: "Um pod produtor está inativo há mais de 5 minutos"
