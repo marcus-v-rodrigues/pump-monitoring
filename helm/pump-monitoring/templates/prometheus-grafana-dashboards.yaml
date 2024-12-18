@@ -1,8 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: grafana-dashboards
+  name: prometheus-grafana-dashboards
   labels:
+    {{- include "pump-monitoring.labels" . | nindent 4 }}
     grafana_dashboard: "1"
 data:
   pump-dashboards.json: |-
@@ -78,8 +79,9 @@ data:
                 "type": "postgres",
                 "uid": "TimescaleDB"
               },
+              "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT\n  time_bucket('1m', time) AS \"time\",\n  avg(pressure) as pressure,\n  avg(flow_rate) as flow_rate\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nGROUP BY 1\nORDER BY 1;",
+              "rawSql": "SELECT\n  time_bucket('1m', time) AS \"time\",\n  avg(pressure) as pressure,\n  avg(flow_rate) as flow_rate\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nGROUP BY 1\nORDER BY 1",
               "refId": "A"
             }
           ],
@@ -142,8 +144,9 @@ data:
                 "type": "postgres",
                 "uid": "TimescaleDB"
               },
+              "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT\n  time as \"time\",\n  temperature\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nORDER BY time DESC\nLIMIT 1;",
+              "rawSql": "SELECT\n  time AS \"time\",\n  temperature\nFROM pump_metrics\nWHERE\n  $__timeFilter(time)\nORDER BY time DESC\nLIMIT 1",
               "refId": "A"
             }
           ],
@@ -230,7 +233,7 @@ data:
                 "uid": "prometheus"
               },
               "expr": "system_metrics{metric_type=~\"cpu_usage|memory_usage\"}",
-              "legendFormat": "$metric_type",
+              "legendFormat": "{{`{{metric_type}}`}}",
               "refId": "A"
             }
           ],
@@ -315,8 +318,8 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "rate(pump_operations_total[5m])",
-              "legendFormat": "$operation_type",
+              "expr": "rate(pump_operations_total{operation_type!=\"\"}[5m])",
+              "legendFormat": "{{`{{operation_type}}`}}",
               "refId": "A"
             }
           ],

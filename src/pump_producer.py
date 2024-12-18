@@ -59,14 +59,23 @@ class PumpDataProducer:
         """Configura monitoramento de métricas do sistema."""
         def monitor_system_metrics():
             while True:
-                try:
-                    SYSTEM_METRICS.labels(metric_type='cpu_usage').set(psutil.cpu_percent())
-                    SYSTEM_METRICS.labels(metric_type='memory_usage').set(psutil.virtual_memory().percent)
-                    SYSTEM_METRICS.labels(metric_type='disk_usage').set(psutil.disk_usage('/').percent)
+                try:                   
+
+                    # Coleta CPU com intervalo de 1 segundo para maior precisão
+                    cpu_usage = psutil.cpu_percent(interval=1)
+                    memory_usage = psutil.virtual_memory().percent
+                    disk_usage = psutil.disk_usage('/').percent
+
+                    # Atualiza métricas do Prometheus
+                    SYSTEM_METRICS.labels(metric_type='cpu_usage').set(cpu_usage)
+                    SYSTEM_METRICS.labels(metric_type='memory_usage').set(memory_usage)
+
+                    logger.info(f"Sistema - CPU: {cpu_usage}%, Memória: {memory_usage}%, Disco: {disk_usage}%")
                 except Exception as e:
                     logger.error(f"Erro ao coletar métricas do sistema: {e}")
-                time.sleep(15)
+                time.sleep(14)  # 14 segundos + 1 segundo do interval = 15 segundos total
         
+        # Inicia a thread de monitoramento
         threading.Thread(target=monitor_system_metrics, daemon=True).start()
 
     def setup_database(self):
@@ -119,20 +128,23 @@ class PumpDataProducer:
                 logger.info("✅ Banco de dados configurado com sucesso!")
                 cur.close()
                 conn.close()
-                return
+                PUMP_OPERATIONS.labels(operation_type='success').inc()
+                return True
                 
             except psycopg2.Error as e:
                 last_error = e
                 retry_count += 1
                 logger.error(f"Tentativa {retry_count} falhou: {e}")
+                PUMP_OPERATIONS.labels(operation_type='failure').inc()
                 if retry_count < self.max_retries:
                     logger.info(f"Tentando novamente em {self.retry_delay} segundos...")
                     time.sleep(self.retry_delay)
                 continue
                 
             except Exception as e:
+                PUMP_OPERATIONS.labels(operation_type='error').inc()
                 logger.error(f"Erro inesperado ao configurar banco de dados: {e}")
-                raise
+                return False
 
         if last_error:
             logger.error(f"❌ Falha ao configurar banco de dados após {self.max_retries} tentativas: {last_error}")
@@ -237,6 +249,7 @@ class PumpDataProducer:
                     # Reseta contadores em caso de sucesso
                     consecutive_failures = 0
                     formatted_data = self.format_data(data)
+                    PUMP_OPERATIONS.labels(operation_type='total').inc()
                     logger.info(f"✅ Dados armazenados com sucesso: {formatted_data}")
                     
                     # Atualiza métricas de sistema

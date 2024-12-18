@@ -4,6 +4,8 @@ metadata:
   name: {{ .Release.Name }}-producer
   labels:
     {{- include "pump-monitoring.labels" . | nindent 4 }}
+    app: pump-producer
+    release: prometheus
 spec:
   replicas: {{ .Values.producer.replicaCount }}
   strategy:
@@ -18,6 +20,7 @@ spec:
     metadata:
       labels:
         app: pump-producer
+        release: prometheus
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.global.env.MONITORING_PROMETHEUS_PORT | int }}"
@@ -79,12 +82,15 @@ spec:
           secret:
             secretName: {{ .Values.global.env.KUBERNETES_CERTIFICATE_SECRET_NAME }}
 ---
+# service.yaml
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-producer
   labels:
     {{- include "pump-monitoring.labels" . | nindent 4 }}
+    app: pump-producer
+    release: prometheus
 spec:
   type: ClusterIP
   ports:

@@ -131,60 +131,60 @@ timescaledb-single:
     enabled: false
 
 # Configurações do Grafana
-grafana:
-  extraVolumes:
-    - name: ssl-certs
-      secret:
-        secretName: ${KUBERNETES_CERTIFICATE_SECRET_NAME}
+# grafana:
+#   extraVolumes:
+#     - name: ssl-certs
+#       secret:
+#         secretName: ${KUBERNETES_CERTIFICATE_SECRET_NAME}
 
-  extraVolumeMounts:
-    - name: ssl-certs
-      mountPath: /etc/grafana/ssl
-      readOnly: true
+#   extraVolumeMounts:
+#     - name: ssl-certs
+#       mountPath: /etc/grafana/ssl
+#       readOnly: true
 
-  adminPassword: ${GRAFANA_ADMIN_PASSWORD}
+#   adminPassword: ${GRAFANA_ADMIN_PASSWORD}
   
-  persistence:
-    enabled: true
-    size: ${GRAFANA_PERSISTENCE_SIZE}
+#   persistence:
+#     enabled: true
+#     size: ${GRAFANA_PERSISTENCE_SIZE}
   
-  dashboardProviders:
-    dashboardproviders.yaml:
-      apiVersion: 1
-      providers:
-      - name: 'default'
-        orgId: 1
-        folder: ''
-        type: file
-        disableDeletion: false
-        editable: true
-        options:
-          path: /var/lib/grafana/dashboards
+#   dashboardProviders:
+#     dashboardproviders.yaml:
+#       apiVersion: 1
+#       providers:
+#       - name: 'default'
+#         orgId: 1
+#         folder: ''
+#         type: file
+#         disableDeletion: false
+#         editable: true
+#         options:
+#           path: /var/lib/grafana/dashboards
   
-  dashboardsConfigMaps:
-    default: grafana-dashboards
+#   dashboardsConfigMaps:
+#     default: grafana-dashboards
   
-  datasources:
-    datasources.yaml:
-      apiVersion: 1
-      datasources:
-        - name: TimescaleDB
-          type: postgres
-          url: ${DATABASE_HOST}:${DATABASE_PORT}
-          database: ${DATABASE_NAME}
-          user: ${DATABASE_USER}
-          jsonData:
-            database: ${DATABASE_NAME}
-            sslmode: "require"
-            tlsAuthWithCACert: false  
-            tlsConfigurationMethod: "file"
-            tlsCACert: ${SSL_CA_FILE}
-            tlsClientCert: ${SSL_CERT_FILE}
-            tlsClientKey: ${SSL_KEY_FILE}
-            maxOpenConns: ${TIMESCALEDB_MAX_CONNECTIONS}
-            maxIdleConns: ${TIMESCALEDB_MAX_CONNECTIONS}
-            connMaxLifetime: 14400
-            postgresVersion: 1400
-            timescaledb: true
-          secureJsonData:
-            password: ${DATABASE_PASSWORD}
+#   datasources:
+#     datasources.yaml:
+#       apiVersion: 1
+#       datasources:
+#         - name: TimescaleDB
+#           type: postgres
+#           url: ${DATABASE_HOST}:${DATABASE_PORT}
+#           database: ${DATABASE_NAME}
+#           user: ${DATABASE_USER}
+#           jsonData:
+#             database: ${DATABASE_NAME}
+#             sslmode: "require"
+#             tlsAuthWithCACert: false  
+#             tlsConfigurationMethod: "file"
+#             tlsCACert: ${SSL_CA_FILE}
+#             tlsClientCert: ${SSL_CERT_FILE}
+#             tlsClientKey: ${SSL_KEY_FILE}
+#             maxOpenConns: ${TIMESCALEDB_MAX_CONNECTIONS}
+#             maxIdleConns: ${TIMESCALEDB_MAX_CONNECTIONS}
+#             connMaxLifetime: 14400
+#             postgresVersion: 1400
+#             timescaledb: true
+#           secureJsonData:
+#             password: ${DATABASE_PASSWORD}

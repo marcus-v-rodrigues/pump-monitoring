@@ -4,6 +4,7 @@ metadata:
   name: {{ .Release.Name }}-producer-monitor
   labels:
     {{- include "pump-monitoring.labels" . | nindent 4 }}
+    release: prometheus
 spec:
   selector:
     matchLabels:

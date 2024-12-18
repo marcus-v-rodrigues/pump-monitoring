@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-grafana-datasources
+  labels:
+    {{- include "pump-monitoring.labels" . | nindent 4 }}
+    grafana_datasource: "1"
+data:
+  timescaledb-datasource.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: TimescaleDB
+        type: postgres
+        url: {{ .Values.global.env.DATABASE_HOST }}:{{ .Values.global.env.DATABASE_PORT }}
+        database: {{ .Values.global.env.DATABASE_NAME }}
+        user: {{ .Values.global.env.DATABASE_USER }}
+        jsonData:
+          sslmode: "require"
+          tlsAuthWithCACert: false
+          tlsConfigurationMethod: "file"
+          tlsCACert: {{ .Values.global.env.SSL_CA_FILE }}
+          tlsClientCert: {{ .Values.global.env.SSL_CERT_FILE }}
+          tlsClientKey: {{ .Values.global.env.SSL_KEY_FILE }}
+          maxOpenConns: {{ index .Values "timescaledb-single" "patroni" "postgresql" "parameters" "max_connections" }}
+          maxIdleConns: {{ index .Values "timescaledb-single" "patroni" "postgresql" "parameters" "max_connections" }}
+          connMaxLifetime: 14400
+          postgresVersion: 1400
+          timescaledb: true
+        secureJsonData:
+          password: {{ .Values.global.env.DATABASE_PASSWORD }}
