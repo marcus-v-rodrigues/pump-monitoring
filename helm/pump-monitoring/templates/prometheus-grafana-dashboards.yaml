@@ -85,7 +85,7 @@ data:
               "refId": "A"
             }
           ],
-          "title": "Pressão e Fluxo",
+          "title": "Pressure and Flow",
           "type": "timeseries"
         },
         {

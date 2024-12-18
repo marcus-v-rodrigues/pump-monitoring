@@ -7,11 +7,12 @@ from dotenv import load_dotenv
 from datetime import datetime
 import numpy as np
 from flask import Flask, jsonify
-from prometheus_client import start_http_server, Gauge, Counter, Histogram
+from prometheus_client import start_http_server, Gauge, Counter, Histogram, CollectorRegistry
 import psutil
 import threading
+from functools import lru_cache
 
-# Configuração do logging
+# Logging configuration
 log_format = os.getenv('LOGGING_FORMAT', 'json')
 log_level = os.getenv('LOGGING_LEVEL', 'INFO')
 
@@ -30,13 +31,22 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Métricas Prometheus
-PUMP_METRICS = Gauge('pump_metrics', 'Métricas da bomba', ['metric_type'])
-PUMP_OPERATIONS = Counter('pump_operations_total', 'Total de operações da bomba', ['operation_type'])
-PUMP_DATA_PROCESSING_TIME = Histogram('pump_data_processing_seconds', 'Tempo de processamento dos dados')
-SYSTEM_CPU_USAGE = Gauge('system_cpu_usage', 'Uso de CPU do sistema')
-SYSTEM_MEMORY_USAGE = Gauge('system_memory_usage', 'Uso de memória do sistema')
-SYSTEM_DISK_USAGE = Gauge('system_disk_usage', 'Uso de disco do sistema')
+# Prometheus Metrics
+registry = CollectorRegistry()
+
+# Register metrics with custom registry to prevent duplicates
+@lru_cache(maxsize=1)
+def get_metrics():
+    registry = CollectorRegistry()
+    return {
+        'pump_metrics': Gauge('pump_metrics', 'Pump metrics', ['metric_type'], registry=registry),
+        'pump_operations': Counter('pump_operations_total', 'Total pump operations', ['operation_type'], registry=registry),
+        'pump_processing_time': Histogram('pump_data_processing_seconds', 'Data processing time', registry=registry),
+        'system_cpu': Gauge('system_cpu_usage', 'System CPU usage', registry=registry),
+        'system_memory': Gauge('system_memory_usage', 'System memory usage', registry=registry),
+        'system_disk': Gauge('system_disk_usage', 'System disk usage', registry=registry),
+        'registry': registry
+    }
 
 load_dotenv()
 
@@ -59,6 +69,7 @@ class PumpDataProducer:
 
     def setup_system_metrics_monitoring(self):
         def monitor_system_metrics():
+            metrics = get_metrics()
             last_update = 0
             while True:
                 try:
@@ -68,21 +79,22 @@ class PumpDataProducer:
                         memory_usage = psutil.virtual_memory().percent
                         disk_usage = psutil.disk_usage('/').percent
 
-                        SYSTEM_CPU_USAGE.set(cpu_usage)
-                        SYSTEM_MEMORY_USAGE.set(memory_usage)
-                        SYSTEM_DISK_USAGE.set(disk_usage)
+                        metrics['system_cpu'].set(cpu_usage)
+                        metrics['system_memory'].set(memory_usage)
+                        metrics['system_disk'].set(disk_usage)
 
-                        logger.info(f"Sistema - CPU: {cpu_usage}%, Memória: {memory_usage}%, Disco: {disk_usage}%")
+                        logger.info(f"System - CPU: {cpu_usage}%, Memory: {memory_usage}%, Disk: {disk_usage}%")
                         last_update = current_time
                     time.sleep(1)
                 except Exception as e:
-                    logger.error(f"Erro ao coletar métricas do sistema: {e}")
+                    logger.error(f"Error collecting system metrics: {e}")
                     time.sleep(1)
 
         threading.Thread(target=monitor_system_metrics, daemon=True).start()
 
     def setup_database(self):
-        """Configura o esquema do banco de dados com tentativas de reconexão."""
+        """Configures the database schema with reconnection attempts."""
+        metrics = get_metrics()
         retry_count = 0
         last_error = None
 
@@ -92,10 +104,10 @@ class PumpDataProducer:
                 conn.autocommit = True
                 cur = conn.cursor()
                 
-                # Criar extensão TimescaleDB se não existir
+                # Create TimescaleDB extension if it doesn't exist
                 cur.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;")
                 
-                # Criar tabela se não existir
+                # Create table if it doesn't exist
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS pump_metrics (
                         time TIMESTAMPTZ NOT NULL,
@@ -108,74 +120,76 @@ class PumpDataProducer:
                     );
                 """)
                 
-                # Criar índices úteis
+                # Create useful indices
                 cur.execute("""
                     CREATE INDEX IF NOT EXISTS idx_pump_metrics_pump_id 
                     ON pump_metrics (pump_id, time DESC);
                 """)
                 
-                # Converter para hypertable se ainda não for
+                # Convert to hypertable if not already
                 cur.execute("""
                     SELECT create_hypertable('pump_metrics', 'time', 
                         if_not_exists => TRUE, 
                         migrate_data => TRUE);
                 """)
                 
-                # Configurar políticas de retenção de dados
+                # Configure data retention policies
                 cur.execute(f"""
                     SELECT add_retention_policy('pump_metrics', 
                         INTERVAL '{self.retention_days} days', 
                         if_not_exists => TRUE);
                 """)
                 
-                logger.info("✅ Banco de dados configurado com sucesso!")
+                logger.info("✅ Database configured successfully!")
                 cur.close()
                 conn.close()
-                PUMP_OPERATIONS.labels(operation_type='success').inc()
+                metrics['pump_operations'].labels(operation_type='success').inc()
                 return True
                 
             except psycopg2.Error as e:
                 last_error = e
                 retry_count += 1
-                logger.error(f"Tentativa {retry_count} falhou: {e}")
-                PUMP_OPERATIONS.labels(operation_type='failure').inc()
+                logger.error(f"Attempt {retry_count} failed: {e}")
+                metrics['pump_operations'].labels(operation_type='failure').inc()
                 if retry_count < self.max_retries:
-                    logger.info(f"Tentando novamente em {self.retry_delay} segundos...")
+                    logger.info(f"Trying again in {self.retry_delay} seconds...")
                     time.sleep(self.retry_delay)
                 continue
                 
             except Exception as e:
-                PUMP_OPERATIONS.labels(operation_type='error').inc()
-                logger.error(f"Erro inesperado ao configurar banco de dados: {e}")
+                metrics['pump_operations'].labels(operation_type='error').inc()
+                logger.error(f"Unexpected error configuring database: {e}")
                 return False
 
         if last_error:
-            logger.error(f"❌ Falha ao configurar banco de dados após {self.max_retries} tentativas: {last_error}")
+            logger.error(f"❌ Failed to configure database after {self.max_retries} attempts: {last_error}")
             raise last_error
 
     def format_data(self, data):
-        """Formata os dados para exibição no log."""
+        """Formats data for log display."""
         return (
-            f"Pressão: {data['pressure']:.2f} PSI, "
-            f"Fluxo: {data['flow_rate']:.2f} L/min, "
-            f"Temperatura: {data['temperature']:.2f}°C, "
-            f"Vibração: {data['vibration']:.4f} mm/s, "
-            f"Consumo: {data['power_consumption']:.2f} kW"
+            f"Pressure: {data['pressure']:.2f} PSI, "
+            f"Flow Rate: {data['flow_rate']:.2f} L/min, "
+            f"Temperature: {data['temperature']:.2f}°C, "
+            f"Vibration: {data['vibration']:.4f} mm/s, "
+            f"Power Consumption: {data['power_consumption']:.2f} kW"
         )
 
-    @PUMP_DATA_PROCESSING_TIME.time()
     def generate_pump_data(self):
-        """Gera dados simulados da bomba."""
-        data = {
-            'pressure': random.uniform(2.0, 4.0),
-            'flow_rate': random.uniform(100, 200),
-            'temperature': random.uniform(35, 45),
-            'vibration': abs(np.random.normal(0.5, 0.1)),
-            'power_consumption': random.uniform(75, 85)
-        }
-        return data
+        """Generates simulated pump data."""
+        metrics = get_metrics()
+        with metrics['pump_processing_time'].time():
+            data = {
+                'pressure': random.uniform(2.0, 4.0),
+                'flow_rate': random.uniform(100, 200),
+                'temperature': random.uniform(35, 45),
+                'vibration': abs(np.random.normal(0.5, 0.1)),
+                'power_consumption': random.uniform(75, 85)
+            }
+            return data
 
     def store_data(self, data):
+        metrics = get_metrics()
         retry_count = 0
         
         while retry_count < self.max_retries:
@@ -201,17 +215,17 @@ class PumpDataProducer:
                 cur.close()
                 conn.close()
 
-                # Atualizar métricas da bomba
+                # Update pump metrics
                 for key, value in data.items():
-                    PUMP_METRICS.labels(metric_type=key).set(value)
+                    metrics['pump_metrics'].labels(metric_type=key).set(value)
 
-                PUMP_OPERATIONS.labels(operation_type='success').inc()
+                metrics['pump_operations'].labels(operation_type='success').inc()
                 return True
 
             except Exception as e:
                 retry_count += 1
-                logger.error(f"Tentativa {retry_count} falhou ao armazenar dados: {e}")
-                PUMP_OPERATIONS.labels(operation_type='failure').inc()
+                logger.error(f"Attempt {retry_count} failed to store data: {e}")
+                metrics['pump_operations'].labels(operation_type='failure').inc()
                 if retry_count < self.max_retries:
                     time.sleep(self.retry_delay)
                 continue
@@ -220,39 +234,40 @@ class PumpDataProducer:
         return False
 
     def run(self):
-        """Loop principal do produtor.
+        """Main producer loop.
         
-        Este método implementa o loop principal que:
-        1. Gera e armazena dados continuamente
-        2. Gerencia métricas e monitoramento
-        3. Implementa lógica de recuperação de falhas
-        4. Mantém estatísticas de operação
+        This method implements the main loop that:
+        1. Continuously generates and stores data
+        2. Manages metrics and monitoring
+        3. Implements failure recovery logic
+        4. Maintains operation statistics
         """
+        metrics = get_metrics()
         consecutive_failures = 0
         max_consecutive_failures = 3
-        base_delay = 1  # Delay base em segundos
-        max_delay = 30  # Delay máximo em segundos
+        base_delay = 1  # Base delay in seconds
+        max_delay = 30  # Maximum delay in seconds
 
         logger.info(f"✅ Starting Data Producer for Pump {self.pump_id}")
         
         while True:
             try:
-                # Gera e armazena dados com monitoramento de tempo
-                with PUMP_DATA_PROCESSING_TIME.time():
+                # Generate and store data with time monitoring
+                with metrics['pump_processing_time'].time():
                     data = self.generate_pump_data()
                     success = self.store_data(data)
 
                 if success:
-                    # Reseta contadores em caso de sucesso
+                    # Reset counters on success
                     consecutive_failures = 0
                     formatted_data = self.format_data(data)
-                    PUMP_OPERATIONS.labels(operation_type='total').inc()
+                    metrics['pump_operations'].labels(operation_type='total').inc()
                     logger.info(f"✅ Data stored successfully: {formatted_data}")
                     
-                    # Delay padrão entre operações bem-sucedidas
+                    # Standard delay between successful operations
                     time.sleep(base_delay)
                 else:
-                    # Incrementa falhas e aplica backoff exponencial
+                    # Increment failures and apply exponential backoff
                     consecutive_failures += 1
                     delay = min(base_delay * (2 ** consecutive_failures), max_delay)
                     
@@ -262,33 +277,33 @@ class PumpDataProducer:
                         f"Waiting {delay} seconds."
                     )
                     
-                    # Verifica se atingiu o limite de falhas consecutivas
+                    # Check if maximum consecutive failures reached
                     if consecutive_failures >= max_consecutive_failures:
                         logger.error(
-                            f" ❌ Maximum number of consecutive failures reached"
+                            f" ❌ Maximum number of consecutive failures reached "
                             f"({max_consecutive_failures}). Restarting service..."
                         )
-                        # Aqui poderíamos implementar uma lógica de reinicialização
-                        # Por enquanto, apenas resetamos o contador
+                        # Here we could implement a restart logic
+                        # For now, we just reset the counter
                         consecutive_failures = 0
                     
                     time.sleep(delay)
                     
             except Exception as e:
                 logger.error(f"❌ Critical error in the main loop: {str(e)}")
-                PUMP_OPERATIONS.labels(operation_type='error').inc()
+                metrics['pump_operations'].labels(operation_type='error').inc()
                 
-                # Em caso de erro crítico, aguarda um pouco antes de tentar novamente
+                # On critical error, wait before trying again
                 time.sleep(5)
                 continue
 
 @app.route('/health')
 def health():
     """
-    Endpoint de verificação de saúde da aplicação.
-    Retorna o status do serviço e o identificador da bomba.
-    Este endpoint é crucial para monitoramento e verificações
-    de disponibilidade do serviço (health checks).
+    Application health check endpoint.
+    Returns the service status and pump identifier.
+    This endpoint is crucial for monitoring and service
+    availability checks (health checks).
     """
     return {
         'status': 'healthy',
@@ -298,16 +313,16 @@ def health():
 @app.route('/metrics/summary')
 def metrics_summary():
     """
-    Endpoint para resumo estatístico das métricas da bomba.
-    Fornece uma visão consolidada das últimas métricas coletadas,
-    incluindo médias de pressão, temperatura e vibração da última hora,
-    além do uso atual de recursos do sistema.
+    Endpoint for pump metrics statistical summary.
+    Provides a consolidated view of the latest collected metrics,
+    including pressure, temperature, and vibration averages from the last hour,
+    plus current system resource usage.
     """
     try:
         conn = psycopg2.connect(**PumpDataProducer().db_config)
         cur = conn.cursor()
         
-        # Consulta métricas da última hora
+        # Query metrics from the last hour
         cur.execute("""
             SELECT 
                 COUNT(*) as total_records,
@@ -335,28 +350,29 @@ def metrics_summary():
         return {'error': str(e)}, 500
 
 if __name__ == "__main__":
-    # Configuração inicial dos servidores
+    # Initial server configuration
     prometheus_port = int(os.getenv('MONITORING_PROMETHEUS_PORT', '8000'))
     flask_port = int(os.getenv('MONITORING_FLASK_PORT', '8080'))
     
-    # Inicia servidor Prometheus em thread separada
-    start_http_server(prometheus_port)
+    # Start Prometheus server in separate thread
+    metrics = get_metrics()
+    start_http_server(prometheus_port, registry=metrics['registry'])
     logger.info(f"📊 Prometheus server started on port {prometheus_port}")
     
-    # Inicia servidor Flask em thread separada
+    # Start Flask server in separate thread
     flask_thread = threading.Thread(
         target=lambda: app.run(
             host='0.0.0.0', 
             port=flask_port, 
             debug=os.getenv('MONITORING_DEBUG', 'false').lower() == 'true'
         ),
-        daemon=True  # Garante que a thread termine quando o programa principal terminar
+        daemon=True  # Ensures thread terminates when main program ends
     )
     flask_thread.start()
     logger.info(f"🌐 Flask server started on port {flask_port}")
     
     try:
-        # Inicia o produtor
+        # Start the producer
         producer = PumpDataProducer()
         logger.info("🚀 Starting data producer...")
         producer.run()
